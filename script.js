@@ -21,6 +21,9 @@ const playAgainBtn = document.querySelector('.play-again');
 // Equations
 let questionAmount = 0;
 let equationsArray = [];
+// store player guess from right and wrong guesses
+let playerGuessArray = [];
+let bestScoreArray = [];
 
 // Game Page
 let firstNumber = 0;
@@ -29,9 +32,142 @@ let equationObject = {};
 const wrongFormat = [];
 
 // Time
-
+let timer;
+let timePlayed = 0;
+let baseTime = 0;
+let penaltyTime = 0;
+let finalTime = 0;
+let finalTimeDisplay = '0.0';
 // Scroll
+let valueY = 0;
 
+// Refresh splash page best scores
+const bestScoresToDOM = () =>{
+  bestScores.forEach((bestScore, index) =>{
+    const bestScoreEL = bestScore;
+    bestScoreEL.textContent = `${bestScoreArray[index].bestScore}s`
+  });
+}
+// Check local storage for best scores and set it
+const getSavedBestScores = () =>{
+  if (localStorage.getItem('bestScores')){
+    bestScoreArray = JSON.parse(localStorage.bestScores);
+  }
+  else{
+    bestScoreArray = [
+      {questions: 10, bestScore: finalTimeDisplay},
+      {questions: 25, bestScore: finalTimeDisplay},
+      {questions: 50, bestScore: finalTimeDisplay},
+      {questions: 99, bestScore: finalTimeDisplay}
+    ];
+    localStorage.setItem('bestScores', JSON.stringify(bestScoreArray));
+  }
+  // Set best scores to dom
+  bestScoresToDOM();
+}
+
+// Update best score array
+const updateBestScore = () =>{
+  bestScoreArray.forEach((score, index) =>{
+    // Select the correct best score to update
+    if (questionAmount == score.questions){
+      // return the best score as a number with 1 decimal
+      const savedBestScore = Number(bestScoreArray[index].bestScore);
+      //  update if  the new final score is less than or replacing 0
+      if (savedBestScore === 0 || savedBestScore > finalTime){
+        bestScoreArray[index].bestScore = finalTimeDisplay;
+      }
+    }
+  })
+  // Update splash page
+  bestScoresToDOM();
+  // Save to local storage
+  localStorage.setItem('bestScores', JSON.stringify(bestScoreArray));
+}
+//Reset Game
+const playAgain = () =>{
+  
+  gamePage.addEventListener('click',startTimer);
+  scorePage.hidden = true;
+  splashPage.hidden = false;
+  equationsArray = []
+  playerGuessArray = []
+  valueY = 0;
+  playAgainBtn.hidden = true;
+
+}
+
+// Show score page
+const showScorePage = () =>{
+  //  show play again button after one second
+  setTimeout(() => {
+    playAgainBtn.hidden = false;
+  }, 1000);
+  gamePage.hidden = true;
+  scorePage.hidden = false;
+}
+// Format and display time in DOM to 1 decimal
+const scoresToDom=()=>{
+  finalTimeDisplay = finalTime.toFixed(1);
+  baseTime = timePlayed.toFixed(1);
+  penaltyTime = penaltyTime.toFixed(1);
+  baseTimeEl.textContent =`Base Time: ${baseTime}s`;
+  penaltyTimeEl.textContent = `Penalty: +${penaltyTime}s`
+  finalTimeEl.textContent = `${finalTimeDisplay}s`
+  // Update scores
+  updateBestScore();
+  // Scroll back to the top
+  itemContainer.scrollTo({top: 0, behavior: "instant"});
+  showScorePage();
+}
+// Stop timeer and process results then go to score page
+const checkTime = () =>{
+  if(playerGuessArray.length == questionAmount){
+    clearInterval(timer);
+    equationsArray.forEach((equation, index)=>{
+      console.log(equation.evaluated === playerGuessArray[index])
+      if (equation.evaluated === playerGuessArray[index]){
+
+      }
+      else{
+        penaltyTime += 0.5;
+      }
+      
+    });
+    finalTime = timePlayed + penaltyTime;
+    scoresToDom();
+  
+  }
+}
+// Add tenth of a second to timePlayed
+const addTime = ()=>{
+  timePlayed += 0.1;
+  checkTime();
+}
+//Start timer when game page is clicked
+const startTimer = () =>{
+  timePlayed = 0;
+  penaltyTime = 0;
+  finalTime = 0;
+  timer = setInterval(addTime, 100);
+  // remove event listener after it is first run
+  gamePage.removeEventListener('click', startTimer);
+}
+// Scroll and store user selection in playerGuessArray
+
+const select = (guessedTrue) =>{
+  
+  //Scroll 80px
+  valueY += 80;
+  itemContainer.scroll(0, valueY);
+  // Add guess to playerguessarray
+  return guessedTrue ? playerGuessArray.push('true') : playerGuessArray.push('false')
+}
+// Display game page 
+const showGamePage= () =>{
+  gamePage.hidden = false;
+  countdownPage.hidden = true;
+}
 // Get a random number up to a max number
 const getRandomInt = (max) =>{
   return Math.floor(Math.random() * Math.floor(max));
@@ -64,30 +200,49 @@ function createEquations() {
     equationObject = { value: equation, evaluated: 'false' };
     equationsArray.push(equationObject);
   }
-  shuffle(equationsArray)
-  console.log('equations array', equationsArray)
+  // call shuffle from shuffle.js to randomly shuffle array
+  shuffle(equationsArray);
+
+}
+
+//Add equations to DOM
+const equationsToDOM = () =>{
+  equationsArray.forEach((equation)=>{
+    // Item
+    const item = document.createElement('div');
+    item.classList.add('item');
+    // Equation text
+    const equationText = document.createElement('h1')
+    equationText.textContent = equation.value
+    //Append
+    item.appendChild(equationText);
+    itemContainer.appendChild(item);
+
+  });
 }
 
 // Dynamically adding correct/incorrect equations
-// function populateGamePage() {
-//   // Reset DOM, Set Blank Space Above
-//   itemContainer.textContent = '';
-//   // Spacer
-//   const topSpacer = document.createElement('div');
-//   topSpacer.classList.add('height-240');
-//   // Selected Item
-//   const selectedItem = document.createElement('div');
-//   selectedItem.classList.add('selected-item');
-//   // Append
-//   itemContainer.append(topSpacer, selectedItem);
+function populateGamePage() {
+  // Reset DOM, Set Blank Space Above
+  itemContainer.textContent = '';
+  // Spacer
+  const topSpacer = document.createElement('div');
+  topSpacer.classList.add('height-240');
+  // Selected Item
+  const selectedItem = document.createElement('div');
+  selectedItem.classList.add('selected-item');
+  // Append
+  itemContainer.append(topSpacer, selectedItem);
 
-//   // Create Equations, Build Elements in DOM
-
-//   // Set Blank Space Below
-//   const bottomSpacer = document.createElement('div');
-//   bottomSpacer.classList.add('height-500');
-//   itemContainer.appendChild(bottomSpacer);
-// }
+  // Create Equations, Build Elements in DOM
+  createEquations();
+  equationsToDOM();
+  // Set Blank Space Below
+  const bottomSpacer = document.createElement('div');
+  bottomSpacer.classList.add('height-500');
+  itemContainer.appendChild(bottomSpacer);
+  
+}
 
 //Get value from selected radio button
 const getRadioValue = () =>{
@@ -104,24 +259,38 @@ const getRadioValue = () =>{
 }
 // Show countdown counting down
 const countdownStart = () =>{
-  countdown.textContent = '3'
-  setTimeout(() => {  countdown.textContent = '2'  }, 1000);
-  setTimeout(() => { countdown.textContent = '1' }, 2000);
-  setTimeout(() => {  countdown.textContent = 'GO!'}, 3000);
+  let count = 3;
+  countdown.textContent = count
+  const timeCountDown = setInterval(() => {
+    count --;
+    if (count === 0 ){
+      countdown.textContent = 'GO!'
+    }
+    else if (count === -1){
+      showGamePage();
+      clearInterval(timeCountDown);
+    } 
+    else {
+      countdown.textContent = count
+    } 
+  }, 1000);
+  // setTimeout(() => {  countdown.textContent = '2'  }, 1000);
+  // setTimeout(() => { countdown.textContent = '1' }, 2000);
+  // setTimeout(() => {  countdown.textContent = 'GO!'}, 3000);
 }
 // Show countdown page after user selects level on splash page
 const showCountdown = () =>{
   countdownPage.hidden = false;
   splashPage.hidden = true;
+  populateGamePage();
   countdownStart();
-  createEquations();
+  
 }
 
 // Form that decides the amount of questions
 const selectQuestionAmount = (e) =>{
   e.preventDefault();
   questionAmount =getRadioValue();
-  console.log('question amount', questionAmount)
   questionAmount !== undefined ? showCountdown() : '';
 }
 
@@ -139,3 +308,7 @@ startForm.addEventListener('click', () =>{
 //Event listeners
 
 startForm.addEventListener('submit', selectQuestionAmount);
+gamePage.addEventListener('click',startTimer);
+
+// On page load
+getSavedBestScores()
